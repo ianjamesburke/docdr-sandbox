@@ -1,7 +1,8 @@
 """Simple FastAPI app for testing DocDr documentation generation."""
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
+from auth import require_api_key
 
-app = FastAPI(title="Sandbox API", version="0.1.0")
+app = FastAPI(title="Sandbox API", version="0.2.0")
 
 ITEMS: dict[int, dict] = {}
 _next_id = 1
@@ -25,7 +26,7 @@ def get_item(item_id: int):
 
 
 @app.post("/items", status_code=201)
-def create_item(name: str, description: str = ""):
+def create_item(name: str, description: str = "", _key: dict = Depends(require_api_key)):
     global _next_id
     item = {"id": _next_id, "name": name, "description": description}
     ITEMS[_next_id] = item
@@ -34,7 +35,7 @@ def create_item(name: str, description: str = ""):
 
 
 @app.delete("/items/{item_id}", status_code=204)
-def delete_item(item_id: int):
+def delete_item(item_id: int, _key: dict = Depends(require_api_key)):
     if item_id not in ITEMS:
         raise HTTPException(status_code=404, detail="Item not found")
     del ITEMS[item_id]
