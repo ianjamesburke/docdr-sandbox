@@ -38,3 +38,4 @@ def delete_item(item_id: int):
     if item_id not in ITEMS:
         raise HTTPException(status_code=404, detail="Item not found")
     del ITEMS[item_id]
+# Trigger bootstrap
