@@ -42,8 +42,15 @@ Once running, navigate to:
 - **Interactive Swagger UI**: `http://127.0.0.1:8000/docs` 
 - **Alternative ReDoc UI**: `http://127.0.0.1:8000/redoc` 
 
+## Authentication
+
+Modifying operations (such as creating and deleting items) require API key authentication.
+- **Header Name**: `X-API-Key`
+- **Implementation**: Managed via dependencies defined in `auth.py`.
+
 ## Repository Structure
 
 - `app.py`: Core application entrypoint defining paths, middleware, and request/response lifecycles.
+- `auth.py`: Authentication and authorization subsystem handling API key validation and permission levels.
 - `pyproject.toml`: Project metadata, tool configurations, and dependency lists conforming to PEP 621.
 - `.github/workflows/docdr.yml`: CI workflow validating documentation health and standard project compliance.
