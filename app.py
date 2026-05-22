@@ -39,3 +39,11 @@ def delete_item(item_id: int):
         raise HTTPException(status_code=404, detail="Item not found")
     del ITEMS[item_id]
 # Trigger bootstrap
+
+
+@app.put('/items/{item_id}')
+def update_item(item_id: int, name: str):
+    if item_id not in ITEMS:
+        raise HTTPException(status_code=404, detail='Item not found')
+    ITEMS[item_id]['name'] = name
+    return ITEMS[item_id]
