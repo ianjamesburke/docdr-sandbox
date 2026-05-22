@@ -71,3 +71,11 @@ def duplicate_item(item_id: int):
     ITEMS[_next_id] = copy
     _next_id += 1
     return copy
+
+
+@app.get("/items/page/{page}")
+def list_items_paginated(page: int, size: int = 10):
+    """Return a page of items with total count."""
+    all_items = list(ITEMS.values())
+    start = (page - 1) * size
+    return {"items": all_items[start:start + size], "total": len(all_items), "page": page}
