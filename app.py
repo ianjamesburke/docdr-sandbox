@@ -79,3 +79,9 @@ def list_items_paginated(page: int, size: int = 10):
     all_items = list(ITEMS.values())
     start = (page - 1) * size
     return {"items": all_items[start:start + size], "total": len(all_items), "page": page}
+
+
+@app.get("/items/count")
+def count_items():
+    """Return the total number of items."""
+    return {"count": len(ITEMS)}
