@@ -47,3 +47,26 @@ def update_item(item_id: int, name: str):
         raise HTTPException(status_code=404, detail='Item not found')
     ITEMS[item_id]['name'] = name
     return ITEMS[item_id]
+
+
+@app.get("/items/search")
+def search_items(q: str):
+    """Search items by name substring (case-insensitive)."""
+    results = [
+        item for item in ITEMS.values()
+        if q.lower() in item["name"].lower()
+    ]
+    return results
+
+
+@app.post("/items/{item_id}/duplicate", status_code=201)
+def duplicate_item(item_id: int):
+    """Create a copy of an existing item with a new ID."""
+    global _next_id
+    if item_id not in ITEMS:
+        raise HTTPException(status_code=404, detail="Item not found")
+    original = ITEMS[item_id]
+    copy = {"id": _next_id, "name": f"{original['name']} (copy)", "description": original["description"]}
+    ITEMS[_next_id] = copy
+    _next_id += 1
+    return copy
