@@ -4,7 +4,7 @@ This document contextualizes the architectural framework of `sandbox-api`.
 
 ## System Architecture
 
-The application is designed as an ultra-lightweight monolithic service. Due to its minimalist layout, performance overhead is kept low, serving as an optimal sandbox template.
+The application is designed as an ultra-lightweight monolithic service with an in-memory cache layer. Due to its minimalist layout, performance overhead is kept low, serving as an optimal sandbox template.
 
 ```
                 +--------------------+
@@ -12,25 +12,24 @@ The application is designed as an ultra-lightweight monolithic service. Due to i
                 +---------+----------+
                           | HTTP Request
                           v   
+                +--------------------+      +--------------------+
+                |      FastAPI       |<---->|     LRU Cache      |
+                |     (app.py)       |      |    (cache.py)      |
+                +---------+----------+      +--------------------+
+                          | Processes Router / Schema Logic
+                          v
                 +--------------------+
-                |      FastAPI       |
-                |  (app.py + router) |
-                +----+-----------+---+
-                     |           |
-                     v           v
-         +-----------+------+  +--------------------+
-         | Webhook Registry |  |  JSON Response     |
-         |  (webhooks.py)   |  +--------------------+
-         +------------------+
+                |  JSON Response     |
+                +--------------------+
 ```
 
 ## Key Components
 
 1. **Application Layer (`app.py`)**:
-   All routes, FastAPI instantiation, validation schemas, and exception handlers reside here to reduce architectural fragmentation. It integrates the webhook router for event notifications.
+   All routes, FastAPI instantiation, validation schemas, and exception handlers reside here to reduce architectural fragmentation.
 
-2. **Webhooks Subsystem (`webhooks.py`)**:
-   Registers and manages callback endpoints, supporting HMAC-SHA256 signature generation to secure outbound notifications.
+2. **Caching Layer (`cache.py`)**:
+   Implements a thread-unsafe in-memory LRU cache (`LRUCache`) used to temporarily store responses and avoid redundant calculations.
 
 3. **Configuration (`pyproject.toml`)**:
    Utilizes modern Python build conventions, storing all runtime dependency configuration (`fastapi[standard]`) in a centralized, declarative manner.

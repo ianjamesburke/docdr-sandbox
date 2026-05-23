@@ -45,6 +45,6 @@ Once running, navigate to:
 ## Repository Structure
 
 - `app.py`: Core application entrypoint defining paths, middleware, and request/response lifecycles.
-- `webhooks.py`: Webhook registry system with support for event-driven notifications and HMAC payload signing.
+- `cache.py`: In-memory LRU cache for storing API responses.
 - `pyproject.toml`: Project metadata, tool configurations, and dependency lists conforming to PEP 621.
 - `.github/workflows/docdr.yml`: CI workflow validating documentation health and standard project compliance.
