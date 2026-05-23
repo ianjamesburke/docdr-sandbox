@@ -1,8 +1,10 @@
 """Simple FastAPI app for testing DocDr documentation generation."""
 from fastapi import Depends, FastAPI, HTTPException
 from auth import require_api_key
+from webhooks import router as webhook_router
 
-app = FastAPI(title="Sandbox API", version="0.2.0")
+app = FastAPI(title="Sandbox API", version="0.3.0")
+app.include_router(webhook_router)
 
 ITEMS: dict[int, dict] = {}
 _next_id = 1
