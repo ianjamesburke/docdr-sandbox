@@ -14,22 +14,26 @@ The application is designed as an ultra-lightweight monolithic service. Due to i
                           v   
                 +--------------------+
                 |      FastAPI       |
-                |     (app.py)       |
-                +---------+----------+
-                          | Processes Router / Schema Logic
-                          v
-                +--------------------+
-                |  JSON Response     |
-                +--------------------+
+                |  (app.py + router) |
+                +----+-----------+---+
+                     |           |
+                     v           v
+         +-----------+------+  +--------------------+
+         | Webhook Registry |  |  JSON Response     |
+         |  (webhooks.py)   |  +--------------------+
+         +------------------+
 ```
 
 ## Key Components
 
 1. **Application Layer (`app.py`)**:
-   All routes, FastAPI instantiation, validation schemas, and exception handlers reside here to reduce architectural fragmentation.
+   All routes, FastAPI instantiation, validation schemas, and exception handlers reside here to reduce architectural fragmentation. It integrates the webhook router for event notifications.
 
-2. **Configuration (`pyproject.toml`)**:
+2. **Webhooks Subsystem (`webhooks.py`)**:
+   Registers and manages callback endpoints, supporting HMAC-SHA256 signature generation to secure outbound notifications.
+
+3. **Configuration (`pyproject.toml`)**:
    Utilizes modern Python build conventions, storing all runtime dependency configuration (`fastapi[standard]`) in a centralized, declarative manner.
 
-3. **Quality Assurance (`.github/workflows/docdr.yml`)**:
+4. **Quality Assurance (`.github/workflows/docdr.yml`)**:
    Ensures that standard workspace rules, API formats, and file updates undergo automatic verification during integration lifecycles.
