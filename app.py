@@ -5,12 +5,13 @@ from cache import LRUCache
 from middleware import RequestLoggingMiddleware
 from webhooks import router as webhook_router
 
-app = FastAPI(title="Sandbox API", version="0.5.0")
+app = FastAPI(title="Sandbox API", version="0.6.0")
 item_cache = LRUCache(max_size=256)
 app.add_middleware(RequestLoggingMiddleware)
 app.include_router(webhook_router)
 
 ITEMS: dict[int, dict] = {}
+TAGS: dict[int, set[str]] = {}
 _next_id = 1
 
 
@@ -20,7 +21,9 @@ def health():
 
 
 @app.get("/items")
-def list_items():
+def list_items(tag: str | None = None):
+    if tag:
+        return [item for item in ITEMS.values() if tag in TAGS.get(item["id"], set())]
     return list(ITEMS.values())
 
 
@@ -28,16 +31,17 @@ def list_items():
 def get_item(item_id: int):
     if item_id not in ITEMS:
         raise HTTPException(status_code=404, detail="Item not found")
-    return ITEMS[item_id]
+    return {**ITEMS[item_id], "tags": list(TAGS.get(item_id, set()))}
 
 
 @app.post("/items", status_code=201)
-def create_item(name: str, description: str = "", _key: dict = Depends(require_api_key)):
+def create_item(name: str, description: str = "", tags: str = "", _key: dict = Depends(require_api_key)):
     global _next_id
     item = {"id": _next_id, "name": name, "description": description}
     ITEMS[_next_id] = item
+    TAGS[_next_id] = set(t.strip() for t in tags.split(",") if t.strip())
     _next_id += 1
-    return item
+    return {**item, "tags": list(TAGS[item["id"]])}
 
 
 @app.delete("/items/{item_id}", status_code=204)
@@ -45,15 +49,64 @@ def delete_item(item_id: int, _key: dict = Depends(require_api_key)):
     if item_id not in ITEMS:
         raise HTTPException(status_code=404, detail="Item not found")
     del ITEMS[item_id]
-# Trigger bootstrap
+    TAGS.pop(item_id, None)
 
 
-@app.put('/items/{item_id}')
-def update_item(item_id: int, name: str):
+@app.put("/items/{item_id}")
+def update_item(item_id: int, name: str, description: str | None = None):
     if item_id not in ITEMS:
-        raise HTTPException(status_code=404, detail='Item not found')
-    ITEMS[item_id]['name'] = name
-    return ITEMS[item_id]
+        raise HTTPException(status_code=404, detail="Item not found")
+    ITEMS[item_id]["name"] = name
+    if description is not None:
+        ITEMS[item_id]["description"] = description
+    return {**ITEMS[item_id], "tags": list(TAGS.get(item_id, set()))}
+
+
+@app.post("/items/{item_id}/tags", status_code=200)
+def add_tag(item_id: int, tag: str, _key: dict = Depends(require_api_key)):
+    """Add a tag to an item."""
+    if item_id not in ITEMS:
+        raise HTTPException(status_code=404, detail="Item not found")
+    TAGS.setdefault(item_id, set()).add(tag)
+    return {"id": item_id, "tags": list(TAGS[item_id])}
+
+
+@app.delete("/items/{item_id}/tags/{tag}", status_code=200)
+def remove_tag(item_id: int, tag: str, _key: dict = Depends(require_api_key)):
+    """Remove a tag from an item."""
+    if item_id not in ITEMS:
+        raise HTTPException(status_code=404, detail="Item not found")
+    TAGS.get(item_id, set()).discard(tag)
+    return {"id": item_id, "tags": list(TAGS.get(item_id, set()))}
+
+
+@app.post("/items/batch-delete", status_code=200)
+def batch_delete(item_ids: list[int], _key: dict = Depends(require_api_key)):
+    """Delete multiple items in a single request. Returns counts of deleted and not-found IDs."""
+    deleted = []
+    not_found = []
+    for item_id in item_ids:
+        if item_id in ITEMS:
+            del ITEMS[item_id]
+            TAGS.pop(item_id, None)
+            deleted.append(item_id)
+        else:
+            not_found.append(item_id)
+    return {"deleted": deleted, "not_found": not_found}
+
+
+@app.post("/items/batch-tag", status_code=200)
+def batch_tag(item_ids: list[int], tag: str, _key: dict = Depends(require_api_key)):
+    """Apply a tag to multiple items at once."""
+    applied = []
+    not_found = []
+    for item_id in item_ids:
+        if item_id in ITEMS:
+            TAGS.setdefault(item_id, set()).add(tag)
+            applied.append(item_id)
+        else:
+            not_found.append(item_id)
+    return {"tag": tag, "applied_to": applied, "not_found": not_found}
 
 
 @app.get("/items/search")
@@ -75,19 +128,24 @@ def duplicate_item(item_id: int):
     original = ITEMS[item_id]
     copy = {"id": _next_id, "name": f"{original['name']} (copy)", "description": original["description"]}
     ITEMS[_next_id] = copy
+    TAGS[_next_id] = set(TAGS.get(item_id, set()))
     _next_id += 1
-    return copy
+    return {**copy, "tags": list(TAGS[_next_id - 1])}
 
 
 @app.get("/items/page/{page}")
-def list_items_paginated(page: int, size: int = 10):
-    """Return a page of items with total count."""
+def list_items_paginated(page: int, size: int = 10, tag: str | None = None):
+    """Return a page of items with total count, optionally filtered by tag."""
     all_items = list(ITEMS.values())
+    if tag:
+        all_items = [item for item in all_items if tag in TAGS.get(item["id"], set())]
     start = (page - 1) * size
     return {"items": all_items[start:start + size], "total": len(all_items), "page": page}
 
 
 @app.get("/items/count")
-def count_items():
-    """Return the total number of items."""
+def count_items(tag: str | None = None):
+    """Return total item count, optionally filtered by tag."""
+    if tag:
+        return {"count": sum(1 for item in ITEMS.values() if tag in TAGS.get(item["id"], set())), "tag": tag}
     return {"count": len(ITEMS)}
