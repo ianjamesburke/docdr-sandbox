@@ -166,3 +166,14 @@ def export_items(fmt: str = "json", tag: str | None = None):
         from fastapi.responses import PlainTextResponse
         return PlainTextResponse(buf.getvalue(), media_type="text/csv")
     return items
+
+
+@app.get("/items/stats")
+def item_stats():
+    """Return aggregate stats: total items, total tags, unique tag names."""
+    all_tags = [t for tags in TAGS.values() for t in tags]
+    return {
+        "total_items": len(ITEMS),
+        "total_tags": len(all_tags),
+        "unique_tags": list(set(all_tags)),
+    }
