@@ -44,6 +44,9 @@ Once running, navigate to:
 
 ## Repository Structure
 
-- `app.py`: Core application entrypoint defining paths, middleware, and request/response lifecycles.
+- `app.py`: Core application entrypoint defining paths, routing, and request/response lifecycles.
+- `middleware.py`: Custom ASGI middleware implementing request logging, latency measurement, and IP-based rate limiting.
 - `pyproject.toml`: Project metadata, tool configurations, and dependency lists conforming to PEP 621.
 - `.github/workflows/docdr.yml`: CI workflow validating documentation health and standard project compliance.
+
+---
