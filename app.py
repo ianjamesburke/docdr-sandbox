@@ -149,3 +149,20 @@ def count_items(tag: str | None = None):
     if tag:
         return {"count": sum(1 for item in ITEMS.values() if tag in TAGS.get(item["id"], set())), "tag": tag}
     return {"count": len(ITEMS)}
+
+
+@app.get("/items/export")
+def export_items(fmt: str = "json", tag: str | None = None):
+    """Export all items as JSON or CSV. Accepts optional ?tag= filter."""
+    items = list(ITEMS.values())
+    if tag:
+        items = [item for item in items if tag in TAGS.get(item["id"], set())]
+    if fmt == "csv":
+        import io, csv as csv_mod
+        buf = io.StringIO()
+        writer = csv_mod.DictWriter(buf, fieldnames=["id", "name", "description"])
+        writer.writeheader()
+        writer.writerows(items)
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse(buf.getvalue(), media_type="text/csv")
+    return items
