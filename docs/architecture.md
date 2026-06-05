@@ -31,5 +31,5 @@ The application is designed as an ultra-lightweight monolithic service. Due to i
 2. **Configuration (`pyproject.toml`)**:
    Utilizes modern Python build conventions, storing all runtime dependency configuration (`fastapi[standard]`) in a centralized, declarative manner.
 
-3. **Quality Assurance (`.github/workflows/docdr.yml`)**:
-   Ensures that standard workspace rules, API formats, and file updates undergo automatic verification during integration lifecycles.
+3. **Documentation Automation (`.github/workflows/docdr.yml`)**:
+   Integrates DocDr to automatically update and maintain codebase documentation when changes are merged into primary branches.

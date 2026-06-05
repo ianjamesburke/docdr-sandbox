@@ -46,4 +46,4 @@ Once running, navigate to:
 
 - `app.py`: Core application entrypoint defining paths, middleware, and request/response lifecycles.
 - `pyproject.toml`: Project metadata, tool configurations, and dependency lists conforming to PEP 621.
-- `.github/workflows/docdr.yml`: CI workflow validating documentation health and standard project compliance.
+- `.github/workflows/docdr.yml`: CI/CD workflow running DocDr to automatically maintain and update documentation upon pull request merges.
