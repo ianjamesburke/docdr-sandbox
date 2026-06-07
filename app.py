@@ -2,13 +2,16 @@
 from fastapi import Depends, FastAPI, HTTPException, Request
 from auth import require_api_key
 from cache import LRUCache
+from metrics import MetricsCollector, MetricsMiddleware
 from middleware import RequestLoggingMiddleware
 from rate_limit import RateLimiter
 from webhooks import router as webhook_router
 
-app = FastAPI(title="Sandbox API", version="0.7.0")
+app = FastAPI(title="Sandbox API", version="0.8.0")
 item_cache = LRUCache(max_size=256)
 rate_limiter = RateLimiter(max_requests=60, window_seconds=60)
+metrics_collector = MetricsCollector()
+app.add_middleware(MetricsMiddleware, collector=metrics_collector)
 app.add_middleware(RequestLoggingMiddleware)
 app.include_router(webhook_router)
 
@@ -26,6 +29,18 @@ def health():
 def rate_limit_status(request: Request):
     """Check current rate limit usage for the calling client."""
     return rate_limiter.get_usage(request)
+
+
+@app.get("/metrics")
+def get_metrics(_key: dict = Depends(require_api_key)):
+    """Return per-endpoint request metrics. Requires API key."""
+    return metrics_collector.summary()
+
+
+@app.post("/metrics/reset", status_code=204)
+def reset_metrics(_key: dict = Depends(require_api_key)):
+    """Clear all collected metrics. Requires API key."""
+    metrics_collector.reset()
 
 
 @app.get("/items")
