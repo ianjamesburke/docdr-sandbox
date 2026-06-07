@@ -13,6 +13,12 @@ The application is designed as an ultra-lightweight monolithic service. Due to i
                           | HTTP Request
                           v   
                 +--------------------+
+                | Metrics/Logging    |
+                |    Middleware      |
+                +---------+----------+
+                          | Pass-through
+                          v   
+                +--------------------+
                 |      FastAPI       |
                 |     (app.py)       |
                 +---------+----------+
@@ -28,8 +34,11 @@ The application is designed as an ultra-lightweight monolithic service. Due to i
 1. **Application Layer (`app.py`)**:
    All routes, FastAPI instantiation, validation schemas, and exception handlers reside here to reduce architectural fragmentation.
 
-2. **Configuration (`pyproject.toml`)**:
+2. **Telemetry & Metrics (`metrics.py`)**:
+   Custom middleware and log collector that tracks request volumetric rates, averages request latency, and measures status-code failure counts.
+
+3. **Configuration (`pyproject.toml`)**:
    Utilizes modern Python build conventions, storing all runtime dependency configuration (`fastapi[standard]`) in a centralized, declarative manner.
 
-3. **Quality Assurance (`.github/workflows/docdr.yml`)**:
+4. **Quality Assurance (`.github/workflows/docdr.yml`)**:
    Ensures that standard workspace rules, API formats, and file updates undergo automatic verification during integration lifecycles.
