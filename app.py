@@ -1,12 +1,14 @@
 """Simple FastAPI app for testing DocDr documentation generation."""
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from auth import require_api_key
 from cache import LRUCache
 from middleware import RequestLoggingMiddleware
+from rate_limit import RateLimiter
 from webhooks import router as webhook_router
 
-app = FastAPI(title="Sandbox API", version="0.6.0")
+app = FastAPI(title="Sandbox API", version="0.7.0")
 item_cache = LRUCache(max_size=256)
+rate_limiter = RateLimiter(max_requests=60, window_seconds=60)
 app.add_middleware(RequestLoggingMiddleware)
 app.include_router(webhook_router)
 
@@ -18,6 +20,12 @@ _next_id = 1
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/rate-limit")
+def rate_limit_status(request: Request):
+    """Check current rate limit usage for the calling client."""
+    return rate_limiter.get_usage(request)
 
 
 @app.get("/items")
@@ -35,8 +43,9 @@ def get_item(item_id: int):
 
 
 @app.post("/items", status_code=201)
-def create_item(name: str, description: str = "", tags: str = "", _key: dict = Depends(require_api_key)):
+def create_item(request: Request, name: str, description: str = "", tags: str = "", _key: dict = Depends(require_api_key)):
     global _next_id
+    rate_limiter.check(request)
     item = {"id": _next_id, "name": name, "description": description}
     ITEMS[_next_id] = item
     TAGS[_next_id] = set(t.strip() for t in tags.split(",") if t.strip())
