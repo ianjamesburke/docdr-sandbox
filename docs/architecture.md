@@ -37,8 +37,11 @@ The application is designed as an ultra-lightweight monolithic service. Due to i
 2. **Telemetry & Metrics (`metrics.py`)**:
    Custom middleware and log collector that tracks request volumetric rates, averages request latency, and measures status-code failure counts.
 
-3. **Configuration (`pyproject.toml`)**:
+3. **Notification Subscriptions**:
+   Enables workspaces to register webhook-like target URLs for system events (such as adding workspace members or creating items). Subscriptions are managed via admin endpoints and tracked dynamically during event generation to record active notification counts.
+
+4. **Configuration (`pyproject.toml`)**:
    Utilizes modern Python build conventions, storing all runtime dependency configuration (`fastapi[standard]`) in a centralized, declarative manner.
 
-4. **Quality Assurance (`.github/workflows/docdr.yml`)**:
+5. **Quality Assurance (`.github/workflows/docdr.yml`)**:
    Ensures that standard workspace rules, API formats, and file updates undergo automatic verification during integration lifecycles.
