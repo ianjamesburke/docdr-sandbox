@@ -159,6 +159,28 @@ def list_workspace_items(
     return items
 
 
+@app.get("/workspaces/{workspace_id}/summary")
+def workspace_summary(workspace_id: int, _key: dict = Depends(require_workspace_member)):
+    """Return item and tag totals for one workspace."""
+    if workspace_id not in WORKSPACES:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    workspace_items = [
+        item for item in ITEMS.values()
+        if item.get("workspace_id") == workspace_id
+    ]
+    tag_names = {
+        tag
+        for item in workspace_items
+        for tag in TAGS.get(item["id"], set())
+    }
+    return {
+        "workspace_id": workspace_id,
+        "item_count": len(workspace_items),
+        "unique_tag_count": len(tag_names),
+        "member_count": len(WORKSPACES[workspace_id]["members"]),
+    }
+
+
 @app.delete("/items/{item_id}", status_code=204)
 def delete_item(item_id: int, _key: dict = Depends(require_api_key)):
     if item_id not in ITEMS:
