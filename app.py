@@ -1,6 +1,7 @@
 """Simple FastAPI app for testing DocDr documentation generation."""
 from fastapi import Depends, FastAPI, HTTPException, Request
 from auth import generate_api_key, require_admin, require_api_key, require_workspace_member
+from billing import router as billing_router
 from cache import LRUCache
 from metrics import MetricsCollector, MetricsMiddleware
 from middleware import RequestLoggingMiddleware
@@ -13,6 +14,7 @@ rate_limiter = RateLimiter(max_requests=60, window_seconds=60)
 metrics_collector = MetricsCollector()
 app.add_middleware(MetricsMiddleware, collector=metrics_collector)
 app.add_middleware(RequestLoggingMiddleware)
+app.include_router(billing_router)
 app.include_router(webhook_router)
 
 ITEMS: dict[int, dict] = {}
