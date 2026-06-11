@@ -19,8 +19,10 @@ ITEMS: dict[int, dict] = {}
 TAGS: dict[int, set[str]] = {}
 WORKSPACES: dict[int, dict] = {}
 WORKSPACE_EVENTS: dict[int, list[dict]] = {}
+NOTIFICATION_SUBSCRIPTIONS: dict[int, list[dict]] = {}
 _next_id = 1
 _next_workspace_id = 1
+_next_subscription_id = 1
 
 
 @app.get("/health")
@@ -103,6 +105,11 @@ def add_workspace_member(
         WORKSPACE_EVENTS.setdefault(workspace_id, []).append({
             "type": "member_added",
             "owner": owner,
+            "notification_count": len([
+                subscription
+                for subscription in NOTIFICATION_SUBSCRIPTIONS.get(workspace_id, [])
+                if subscription["status"] == "active"
+            ]),
         })
     return WORKSPACES[workspace_id]
 
@@ -113,6 +120,55 @@ def list_workspace_events(workspace_id: int, _key: dict = Depends(require_worksp
     if workspace_id not in WORKSPACES:
         raise HTTPException(status_code=404, detail="Workspace not found")
     return WORKSPACE_EVENTS.get(workspace_id, [])
+
+
+@app.get("/workspaces/{workspace_id}/notifications")
+def list_notification_subscriptions(
+    workspace_id: int,
+    _key: dict = Depends(require_workspace_member),
+):
+    """List notification subscriptions for a workspace."""
+    if workspace_id not in WORKSPACES:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    return NOTIFICATION_SUBSCRIPTIONS.get(workspace_id, [])
+
+
+@app.post("/workspaces/{workspace_id}/notifications", status_code=201)
+def create_notification_subscription(
+    workspace_id: int,
+    target_url: str,
+    event_type: str = "workspace.event",
+    _admin: dict = Depends(require_admin),
+):
+    """Create an outbound notification subscription for workspace events."""
+    global _next_subscription_id
+    if workspace_id not in WORKSPACES:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    subscription = {
+        "id": _next_subscription_id,
+        "workspace_id": workspace_id,
+        "target_url": target_url,
+        "event_type": event_type,
+        "status": "active",
+    }
+    NOTIFICATION_SUBSCRIPTIONS.setdefault(workspace_id, []).append(subscription)
+    _next_subscription_id += 1
+    return subscription
+
+
+@app.delete("/workspaces/{workspace_id}/notifications/{subscription_id}", status_code=204)
+def delete_notification_subscription(
+    workspace_id: int,
+    subscription_id: int,
+    _admin: dict = Depends(require_admin),
+):
+    """Disable a workspace notification subscription."""
+    subscriptions = NOTIFICATION_SUBSCRIPTIONS.get(workspace_id, [])
+    for subscription in subscriptions:
+        if subscription["id"] == subscription_id:
+            subscription["status"] = "disabled"
+            return
+    raise HTTPException(status_code=404, detail="Notification subscription not found")
 
 
 @app.get("/items")
@@ -157,6 +213,11 @@ def create_item(
         "type": "item_created",
         "item_id": _next_id,
         "name": name,
+        "notification_count": len([
+            subscription
+            for subscription in NOTIFICATION_SUBSCRIPTIONS.get(workspace_id, [])
+            if subscription["status"] == "active"
+        ]),
     })
     _next_id += 1
     return {**item, "tags": list(TAGS[item["id"]])}
