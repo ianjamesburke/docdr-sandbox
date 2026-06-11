@@ -19,7 +19,7 @@ cd sandbox-api
 
 # Create a virtual environment
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\\Scripts\\activate
+source .venv/bin/activate  # On Windows: .venv\\\\Scripts\\\\activate
 ```
 
 ### 2. Install Dependencies
@@ -45,6 +45,7 @@ Once running, navigate to:
 ## Repository Structure
 
 - `app.py`: Core application entrypoint defining paths, middleware, and request/response lifecycles.
+- `billing.py`: Billing and subscription management endpoints for sandbox workspace accounts.
 - `metrics.py`: Telemetry collector and middleware tracking request volumetrics, latency, and status code distribution.
 - `pyproject.toml`: Project metadata, tool configurations, and dependency lists conforming to PEP 621.
 - `.github/workflows/docdr.yml`: CI workflow validating documentation health and standard project compliance.
