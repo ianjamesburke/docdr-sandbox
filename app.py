@@ -1,13 +1,13 @@
 """Simple FastAPI app for testing DocDr documentation generation."""
 from fastapi import Depends, FastAPI, HTTPException, Request
-from auth import require_api_key
+from auth import generate_api_key, require_admin, require_api_key, require_workspace_member
 from cache import LRUCache
 from metrics import MetricsCollector, MetricsMiddleware
 from middleware import RequestLoggingMiddleware
 from rate_limit import RateLimiter
 from webhooks import router as webhook_router
 
-app = FastAPI(title="Sandbox API", version="0.8.0")
+app = FastAPI(title="Sandbox API", version="0.9.0")
 item_cache = LRUCache(max_size=256)
 rate_limiter = RateLimiter(max_requests=60, window_seconds=60)
 metrics_collector = MetricsCollector()
@@ -17,7 +17,9 @@ app.include_router(webhook_router)
 
 ITEMS: dict[int, dict] = {}
 TAGS: dict[int, set[str]] = {}
+WORKSPACES: dict[int, dict] = {}
 _next_id = 1
+_next_workspace_id = 1
 
 
 @app.get("/health")
@@ -43,11 +45,71 @@ def reset_metrics(_key: dict = Depends(require_api_key)):
     metrics_collector.reset()
 
 
+@app.post("/keys", status_code=201)
+def create_api_key(
+    owner: str,
+    role: str = "member",
+    workspace_id: int | None = None,
+    _admin: dict = Depends(require_admin),
+):
+    """Create a workspace-scoped API key. Requires an admin key."""
+    if role not in {"admin", "member"}:
+        raise HTTPException(status_code=400, detail="Unsupported role")
+    if role == "member" and workspace_id not in WORKSPACES:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    key = generate_api_key(owner=owner, role=role, workspace_id=workspace_id)
+    return {"key": key, "owner": owner, "role": role, "workspace_id": workspace_id}
+
+
+@app.get("/workspaces")
+def list_workspaces(_admin: dict = Depends(require_admin)):
+    """List all workspaces. Requires an admin key."""
+    return list(WORKSPACES.values())
+
+
+@app.post("/workspaces", status_code=201)
+def create_workspace(name: str, slug: str, _admin: dict = Depends(require_admin)):
+    """Create an isolated workspace. Requires an admin key."""
+    global _next_workspace_id
+    if any(workspace["slug"] == slug for workspace in WORKSPACES.values()):
+        raise HTTPException(status_code=409, detail="Workspace slug already exists")
+    workspace = {"id": _next_workspace_id, "name": name, "slug": slug, "members": []}
+    WORKSPACES[_next_workspace_id] = workspace
+    _next_workspace_id += 1
+    return workspace
+
+
+@app.get("/workspaces/{workspace_id}")
+def get_workspace(workspace_id: int, _key: dict = Depends(require_workspace_member)):
+    """Return workspace metadata for authorized callers."""
+    if workspace_id not in WORKSPACES:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    return WORKSPACES[workspace_id]
+
+
+@app.post("/workspaces/{workspace_id}/members", status_code=201)
+def add_workspace_member(
+    workspace_id: int,
+    owner: str,
+    _admin: dict = Depends(require_admin),
+):
+    """Add a member owner to a workspace. Requires an admin key."""
+    if workspace_id not in WORKSPACES:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    members = WORKSPACES[workspace_id]["members"]
+    if owner not in members:
+        members.append(owner)
+    return WORKSPACES[workspace_id]
+
+
 @app.get("/items")
-def list_items(tag: str | None = None):
+def list_items(workspace_id: int | None = None, tag: str | None = None):
+    items = list(ITEMS.values())
+    if workspace_id is not None:
+        items = [item for item in items if item.get("workspace_id") == workspace_id]
     if tag:
-        return [item for item in ITEMS.values() if tag in TAGS.get(item["id"], set())]
-    return list(ITEMS.values())
+        return [item for item in items if tag in TAGS.get(item["id"], set())]
+    return items
 
 
 @app.get("/items/{item_id}")
@@ -58,14 +120,43 @@ def get_item(item_id: int):
 
 
 @app.post("/items", status_code=201)
-def create_item(request: Request, name: str, description: str = "", tags: str = "", _key: dict = Depends(require_api_key)):
+def create_item(
+    request: Request,
+    name: str,
+    workspace_id: int,
+    description: str = "",
+    tags: str = "",
+    _key: dict = Depends(require_workspace_member),
+):
     global _next_id
     rate_limiter.check(request)
-    item = {"id": _next_id, "name": name, "description": description}
+    if workspace_id not in WORKSPACES:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    item = {
+        "id": _next_id,
+        "workspace_id": workspace_id,
+        "name": name,
+        "description": description,
+    }
     ITEMS[_next_id] = item
     TAGS[_next_id] = set(t.strip() for t in tags.split(",") if t.strip())
     _next_id += 1
     return {**item, "tags": list(TAGS[item["id"]])}
+
+
+@app.get("/workspaces/{workspace_id}/items")
+def list_workspace_items(
+    workspace_id: int,
+    tag: str | None = None,
+    _key: dict = Depends(require_workspace_member),
+):
+    """List items in a workspace. Requires workspace membership."""
+    if workspace_id not in WORKSPACES:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    items = [item for item in ITEMS.values() if item.get("workspace_id") == workspace_id]
+    if tag:
+        items = [item for item in items if tag in TAGS.get(item["id"], set())]
+    return items
 
 
 @app.delete("/items/{item_id}", status_code=204)
