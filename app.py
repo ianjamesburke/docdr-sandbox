@@ -18,6 +18,7 @@ app.include_router(webhook_router)
 ITEMS: dict[int, dict] = {}
 TAGS: dict[int, set[str]] = {}
 WORKSPACES: dict[int, dict] = {}
+WORKSPACE_EVENTS: dict[int, list[dict]] = {}
 _next_id = 1
 _next_workspace_id = 1
 
@@ -99,7 +100,19 @@ def add_workspace_member(
     members = WORKSPACES[workspace_id]["members"]
     if owner not in members:
         members.append(owner)
+        WORKSPACE_EVENTS.setdefault(workspace_id, []).append({
+            "type": "member_added",
+            "owner": owner,
+        })
     return WORKSPACES[workspace_id]
+
+
+@app.get("/workspaces/{workspace_id}/events")
+def list_workspace_events(workspace_id: int, _key: dict = Depends(require_workspace_member)):
+    """Return recent workspace activity events."""
+    if workspace_id not in WORKSPACES:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    return WORKSPACE_EVENTS.get(workspace_id, [])
 
 
 @app.get("/items")
@@ -140,6 +153,11 @@ def create_item(
     }
     ITEMS[_next_id] = item
     TAGS[_next_id] = set(t.strip() for t in tags.split(",") if t.strip())
+    WORKSPACE_EVENTS.setdefault(workspace_id, []).append({
+        "type": "item_created",
+        "item_id": _next_id,
+        "name": name,
+    })
     _next_id += 1
     return {**item, "tags": list(TAGS[item["id"]])}
 
