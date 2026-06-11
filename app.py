@@ -20,9 +20,11 @@ TAGS: dict[int, set[str]] = {}
 WORKSPACES: dict[int, dict] = {}
 WORKSPACE_EVENTS: dict[int, list[dict]] = {}
 NOTIFICATION_SUBSCRIPTIONS: dict[int, list[dict]] = {}
+AUDIT_REPORTS: dict[int, list[dict]] = {}
 _next_id = 1
 _next_workspace_id = 1
 _next_subscription_id = 1
+_next_audit_report_id = 1
 
 
 @app.get("/health")
@@ -258,6 +260,60 @@ def workspace_summary(workspace_id: int, _key: dict = Depends(require_workspace_
         "unique_tag_count": len(tag_names),
         "member_count": len(WORKSPACES[workspace_id]["members"]),
     }
+
+
+@app.post("/workspaces/{workspace_id}/audit-reports", status_code=202)
+def create_workspace_audit_report(
+    workspace_id: int,
+    include_items: bool = True,
+    include_notifications: bool = True,
+    _admin: dict = Depends(require_admin),
+):
+    """Queue a compliance audit report for a workspace. Requires an admin key."""
+    global _next_audit_report_id
+    if workspace_id not in WORKSPACES:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    workspace_items = [
+        item for item in ITEMS.values()
+        if item.get("workspace_id") == workspace_id
+    ]
+    active_notifications = [
+        subscription
+        for subscription in NOTIFICATION_SUBSCRIPTIONS.get(workspace_id, [])
+        if subscription["status"] == "active"
+    ]
+    report = {
+        "id": _next_audit_report_id,
+        "workspace_id": workspace_id,
+        "status": "queued",
+        "sections": {
+            "items": include_items,
+            "notifications": include_notifications,
+        },
+        "summary": {
+            "item_count": len(workspace_items),
+            "active_notification_count": len(active_notifications),
+            "event_count": len(WORKSPACE_EVENTS.get(workspace_id, [])),
+        },
+    }
+    AUDIT_REPORTS.setdefault(workspace_id, []).append(report)
+    WORKSPACE_EVENTS.setdefault(workspace_id, []).append({
+        "type": "audit_report_queued",
+        "report_id": _next_audit_report_id,
+    })
+    _next_audit_report_id += 1
+    return report
+
+
+@app.get("/workspaces/{workspace_id}/audit-reports")
+def list_workspace_audit_reports(
+    workspace_id: int,
+    _key: dict = Depends(require_workspace_member),
+):
+    """List queued and completed audit reports for a workspace."""
+    if workspace_id not in WORKSPACES:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    return AUDIT_REPORTS.get(workspace_id, [])
 
 
 @app.delete("/items/{item_id}", status_code=204)
